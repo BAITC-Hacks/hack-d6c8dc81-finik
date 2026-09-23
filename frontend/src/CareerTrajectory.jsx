@@ -1,62 +1,5 @@
-import skillData from '../../skills.json'
-
-const grades = ['Junior', 'Middle', 'Senior', 'Lead']
-
-const skillNames = Object.fromEntries(
-  skillData.skills.map((skill) => [skill.skill_id, skill.name]),
-)
-
 function CareerTrajectory({ employee }) {
-  const currentGradeIndex = grades.indexOf(employee.grade)
-
-  const nextGrade =
-    currentGradeIndex >= 0
-      ? grades[currentGradeIndex + 1]
-      : undefined
-
-  const targetRole = employee.career_goal?.target_role ?? employee.role
-  const targetGrade = employee.career_goal?.target_grade ?? nextGrade
-
-  const targetProfile = skillData.role_profiles.find(
-    (profile) =>
-      profile.role === targetRole && profile.grade === targetGrade,
-  )
-
-  if (!targetProfile) {
-    return (
-      <section className="card trajectory-card">
-        <h2>Career trajectory</h2>
-        <p className="assessment-note">
-          {targetGrade
-            ? 'Requirements for this career goal are not available.'
-            : 'No further grade is defined. A new career goal can be discussed with your manager.'}
-        </p>
-      </section>
-    )
-  }
-
-  const requiredSkills = Object.entries(targetProfile.required_skills)
-    .map(([skillId, requiredLevel]) => {
-      const currentLevel = employee.skills[skillId] ?? 0
-
-      return {
-        skillId,
-        name: skillNames[skillId] ?? skillId,
-        currentLevel,
-        requiredLevel,
-        gap: Math.max(0, requiredLevel - currentLevel),
-        critical: targetProfile.critical_skills.includes(skillId),
-      }
-    })
-    .sort(
-      (a, b) =>
-        Number(b.critical) - Number(a.critical) ||
-        b.gap - a.gap ||
-        a.name.localeCompare(b.name),
-    )
-
-  const metCount = requiredSkills.filter((skill) => skill.gap === 0).length
-
+  const { target_role: targetRole, target_grade: targetGrade, skills: requiredSkills, readiness } = employee
   return (
     <section className="card trajectory-card">
       <p className="eyebrow">YOUR NEXT LEVEL</p>
@@ -79,31 +22,31 @@ function CareerTrajectory({ employee }) {
       </div>
 
       <p className="readiness-summary">
-        <strong>{metCount} of {requiredSkills.length}</strong> skill
+        <strong>{readiness.requirements_met} of {readiness.requirements_total}</strong> skill
         requirements met
       </p>
 
       <p className="assessment-note">
-        Based on the assessment dated {employee.last_review_date}.
+        Includes completed activity gains.
         Meeting skill requirements does not automatically grant promotion.
       </p>
 
       <div className="skills-list">
         {requiredSkills.map((skill) => (
-          <div className="skill" key={skill.skillId}>
+          <div className="skill" key={skill.skill_id}>
             <div className="skill-heading">
-              <label htmlFor={`target-${skill.skillId}`}>
+              <label htmlFor={`target-${skill.skill_id}`}>
                 {skill.name}
               </label>
               <strong>
-                {skill.currentLevel} / {skill.requiredLevel}
+                {skill.current_level} / {skill.required_level}
               </strong>
             </div>
 
             <progress
-              id={`target-${skill.skillId}`}
-              value={Math.min(skill.currentLevel, skill.requiredLevel)}
-              max={Math.max(1, skill.requiredLevel)}
+              id={`target-${skill.skill_id}`}
+              value={Math.min(skill.current_level, skill.required_level)}
+              max={Math.max(1, skill.required_level)}
             />
 
             <div className="skill-tags">

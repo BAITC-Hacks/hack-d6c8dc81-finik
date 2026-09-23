@@ -1,46 +1,10 @@
-import { useState } from 'react'
-import skillData from '../../skills.json'
-
-const grades = ['Junior', 'Middle', 'Senior', 'Lead']
-
-function GrowthMilestones({ employee }) {
-  const [celebration, setCelebration] = useState(0)
-
-  const gradeIndex = grades.indexOf(employee.grade)
-  const nextGrade =
-    gradeIndex >= 0 ? grades[gradeIndex + 1] : undefined
-
-  const targetRole = employee.career_goal?.target_role ?? employee.role
-  const targetGrade = employee.career_goal?.target_grade ?? nextGrade
-
-  const targetProfile = skillData.role_profiles.find(
-    (profile) =>
-      profile.role === targetRole && profile.grade === targetGrade,
-  )
-
-  if (!targetProfile) return null
-
-  const requirements = Object.entries(targetProfile.required_skills)
-
-  if (requirements.length === 0) return null
-
-  const completedRequirements = requirements.filter(
-    ([skillId, requiredLevel]) =>
-      (employee.skills[skillId] ?? 0) >= requiredLevel,
-  ).length
-
-  const percentage = Math.round(
-    (completedRequirements / requirements.length) * 100,
-  )
-
-  const criticalSkills = targetProfile.critical_skills ?? []
-
-  const completedCritical = criticalSkills.filter(
-    (skillId) =>
-      (employee.skills[skillId] ?? 0) >=
-      targetProfile.required_skills[skillId],
-  ).length
-
+function GrowthMilestones({ employee, celebration = 0 }) {
+  const { target_role: targetRole, target_grade: targetGrade, readiness } = employee
+  const { requirements_met: completedRequirements, requirements_total: total,
+    critical_requirements_met: completedCritical, critical_requirements_total: criticalTotal } = readiness
+  if (total === 0) return null
+  // Visual formatting of server readiness counts, not a separate readiness model.
+  const percentage = Math.round(completedRequirements / total * 100)
   const milestones = [
     {
       id: 'first',
@@ -53,15 +17,15 @@ function GrowthMilestones({ employee }) {
       title: 'Halfway there',
       description: 'Meet at least half of the target requirements.',
       achieved:
-        completedRequirements >= Math.ceil(requirements.length / 2),
+        completedRequirements >= Math.ceil(total / 2),
     },
-    ...(criticalSkills.length > 0
+    ...(criticalTotal > 0
       ? [
           {
             id: 'critical',
             title: 'Core skills covered',
             description: 'Meet every critical skill requirement.',
-            achieved: completedCritical === criticalSkills.length,
+            achieved: completedCritical === criticalTotal,
           },
         ]
       : []),
@@ -69,7 +33,7 @@ function GrowthMilestones({ employee }) {
       id: 'all',
       title: 'Skill targets reached',
       description: 'Meet all skills listed for your target grade.',
-      achieved: completedRequirements === requirements.length,
+      achieved: completedRequirements === total,
     },
   ]
 
@@ -89,7 +53,7 @@ function GrowthMilestones({ employee }) {
           className="growth-ring"
           style={{ '--growth-angle': `${percentage * 3.6}deg` }}
           role="img"
-          aria-label={`${completedRequirements} of ${requirements.length} target skill requirements met`}
+          aria-label={`${completedRequirements} of ${total} target skill requirements met`}
         >
           <div className="growth-ring-inner">
             <strong>{percentage}%</strong>
@@ -99,7 +63,7 @@ function GrowthMilestones({ employee }) {
 
         <div className="growth-summary">
           <h3>
-            {completedRequirements} of {requirements.length} requirements met
+            {completedRequirements} of {total} requirements met
           </h3>
 
           <p>
@@ -107,9 +71,9 @@ function GrowthMilestones({ employee }) {
             Each relevant activity can help close a skill gap.
           </p>
 
-          {criticalSkills.length > 0 && (
+          {criticalTotal > 0 && (
             <span className="growth-critical">
-              {completedCritical} / {criticalSkills.length} critical
+              {completedCritical} / {criticalTotal} critical
               requirements met
             </span>
           )}
@@ -142,44 +106,28 @@ function GrowthMilestones({ employee }) {
       </ul>
 
       <p className="growth-footnote">
-        Based on the assessment dated {employee.last_review_date}.
+        Based on current backend progress, including completed activities.
         These milestones describe your current skills; they do not
         automatically grant a promotion.
       </p>
 
-      <details className="growth-preview">
-        <summary>Preview the completion animation</summary>
-
-        <p>
-          Interface demonstration only. This does not complete an activity
-          or change employee data.
-        </p>
-
-        <button
-          className="growth-preview-button"
-          type="button"
-          onClick={() => setCelebration((value) => value + 1)}
+      {celebration > 0 && (
+        <div
+          className="growth-celebration"
+          key={celebration}
+          role="status"
         >
-          Play celebration
-        </button>
+          <span className="growth-celebration-icon" aria-hidden="true">
+            ✓
+          </span>
 
-        {celebration > 0 && (
-          <div
-            className="growth-celebration"
-            key={celebration}
-            role="status"
-          >
-            <span className="growth-celebration-icon" aria-hidden="true">
-              ✓
-            </span>
-
-            <div>
-              <strong>A step worth celebrating!</strong>
-              <p>Animation preview — your progress is unchanged.</p>
-            </div>
+          <div>
+            <strong>A step worth celebrating!</strong>
+            <p>Activity completed. Your progress has been updated.</p>
           </div>
-        )}
-      </details>
+        </div>
+      )}
+
     </section>
   )
 }
