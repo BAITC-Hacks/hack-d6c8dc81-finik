@@ -1,56 +1,3 @@
-const sampleRecommendations = [
-  {
-    rank: 1,
-    event_id: 'PREVIEW_001',
-    title: 'System Design Workshop',
-    format: 'online',
-    duration_hours: 3,
-    explanation:
-      'System Design is critical for the target Senior grade. This activity addresses a two-level gap. Previous participation suggests that a practical workshop could be a suitable next step.',
-    factors: {
-      current_grade: 'Middle',
-      target_grade: 'Senior',
-      completed_similar: 2,
-      missed_or_declined_similar: 1,
-      skill_impacts: [
-        {
-          skill_id: 'SK_SYSTEM_DESIGN',
-          name: 'System Design',
-          current_level: 2,
-          required_level: 4,
-          expected_level: 3,
-          critical: true,
-        },
-      ],
-    },
-  },
-  {
-    rank: 2,
-    event_id: 'PREVIEW_002',
-    title: 'Advanced Python Practice',
-    format: 'self_paced',
-    duration_hours: 5,
-    explanation:
-      'Python needs one additional level for the target Senior grade. Previous completion of similar learning activities supports this choice.',
-    factors: {
-      current_grade: 'Middle',
-      target_grade: 'Senior',
-      completed_similar: 1,
-      missed_or_declined_similar: 0,
-      skill_impacts: [
-        {
-          skill_id: 'SK_PYTHON',
-          name: 'Python',
-          current_level: 3,
-          required_level: 4,
-          expected_level: 4,
-          critical: false,
-        },
-      ],
-    },
-  },
-]
-
 const formatLabels = {
   online: 'Online',
   offline: 'In person',
@@ -58,8 +5,8 @@ const formatLabels = {
 }
 
 function Recommendations({
-  recommendations = sampleRecommendations,
-  preview = true,
+  recommendations = [],
+  completionError = '',
   loading = false,
   error = '',
   completingEventId = null,
@@ -73,15 +20,8 @@ function Recommendations({
           <h2>Recommended activities</h2>
         </div>
 
-        {preview && <span className="preview-badge">Layout preview</span>}
       </div>
-
-      {preview && (
-        <p className="assessment-note">
-          These are fictional examples for a Middle Backend Engineer.
-          They are not recommendations for the selected employee.
-        </p>
-      )}
+      {completionError && <p className="recommendation-error" role="alert">{completionError} You can retry Mark completed.</p>}
 
       {loading ? (
         <p role="status">Finding your next steps…</p>
@@ -111,6 +51,7 @@ function Recommendations({
                   recommendation.format}
                 {' · '}
                 {recommendation.duration_hours} hours
+                {recommendation.next_session && ` · Next session: ${recommendation.next_session}`}
               </p>
 
               <p className="recommendation-explanation">
@@ -123,6 +64,8 @@ function Recommendations({
                     <div>
                       <strong>{skill.name}</strong>
                       <span>Target level: {skill.required_level}</span>
+                      <span>Gain: {skill.gain} · Maximum level: {skill.max_level}</span>
+                      {skill.critical && <span className="critical-tag">Critical for promotion</span>}
                     </div>
 
                     <span className="impact-change">
@@ -152,7 +95,6 @@ function Recommendations({
                 className="complete-button"
                 type="button"
                 disabled={
-                  preview ||
                   !onComplete ||
                   completingEventId !== null
                 }
@@ -163,11 +105,6 @@ function Recommendations({
                   : 'Mark completed'}
               </button>
 
-              {preview && (
-                <p className="button-note">
-                  Available after the backend is connected.
-                </p>
-              )}
             </article>
           ))}
         </div>

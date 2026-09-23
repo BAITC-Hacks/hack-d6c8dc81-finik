@@ -1,16 +1,23 @@
-# React + Vite
+# Career Quest frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite presentation for the Career Quest API. See the root
+[README](../README.md) for backend setup, dataset details, demo steps, and checks.
 
-Currently, two official plugins are available:
+From this directory:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```sh
+npm ci
+VITE_API_BASE_URL=http://localhost:8000/api npm run dev -- --host localhost --port 5173 --strictPort
+```
 
-## React Compiler
+`VITE_API_BASE_URL` defaults to `http://localhost:8000/api`. The backend must run
+separately. The English login screen provides demo entry; real sign-in is disabled.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```sh
+npm test
+npm run lint
+npm run build
+```
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+From the repository root, run `node frontend/scripts/browser-smoke.mjs` after
+building the backend for the isolated Chrome integration check.

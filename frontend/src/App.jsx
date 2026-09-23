@@ -1,75 +1,71 @@
-import { useState } from 'react'
-import employeeData from '../../employees.json'
-import skillData from '../../skills.json'
-import CareerTrajectory from './CareerTrajectory'
-import Recommendations from './Recommendations'
+import { useRef, useState } from 'react'
+import { api } from './api'
+import { useApiResource } from './useApiResource'
+import ApiState from './ApiState'
+import EmployeeDashboard from './EmployeeDashboard'
 import HrDashboard from './HrDashboard'
-import './App.css'
+import DataImport from './DataImport'
 import LoginPage from './LoginPage'
-import GrowthMilestones from './GrowthMilestones'
+import './App.css'
 
-
-const employees = employeeData.employees
-
-const skillNames = Object.fromEntries(
-  skillData.skills.map((skill) => [skill.skill_id, skill.name]),
-)
+const loadEmployees = (_key, signal) => api.employees(signal)
 
 function App() {
   const [demoEntered, setDemoEntered] = useState(false)
   const [activeView, setActiveView] = useState('employee')
   const [search, setSearch] = useState('')
-  const [selectedId, setSelectedId] = useState(
-    employees[0]?.employee_id ?? '',
-  )
-if (!demoEntered) {
-  return (
-    <LoginPage
-      onDemo={(view) => {
-        setActiveView(view)
-        setDemoEntered(true)
-      }}
-    />
-  )
-}
-  const employee = employees.find(
-    (person) => person.employee_id === selectedId,
-  )
-
+  const [selection, setSelection] = useState('')
+  const [revision, setRevision] = useState(0)
+  const [hrRevision, setHrRevision] = useState(0)
+  const [busy, setBusy] = useState(false)
+  const mutation = useRef(false)
+  const list = useApiResource(loadEmployees, demoEntered ? 'employees' : null)
+  const employees = list.data?.employees ?? []
+  const employee = employees.find((person) => person.employee_id === selection) ?? employees[0]
+  const selectedId = employee?.employee_id ?? ''
   const query = search.trim().toLowerCase()
-
   const matchingEmployees = employees.filter((person) =>
-    `${person.full_name} ${person.employee_id} ${person.role}`
-      .toLowerCase()
-      .includes(query),
+    `${person.full_name} ${person.employee_id} ${person.role}`.toLowerCase().includes(query),
   )
+  const selectableEmployees = employee && !matchingEmployees.includes(employee)
+    ? [employee, ...matchingEmployees] : matchingEmployees
 
-  // Keep the selected employee in the dropdown while searching.
-  const selectableEmployees =
-    employee &&
-    !matchingEmployees.some(
-      (person) => person.employee_id === employee.employee_id,
-    )
-      ? [employee, ...matchingEmployees]
-      : matchingEmployees
-
-  if (!employee) {
-    return (
-      <main className="page">
-        <h1>No employee profiles available</h1>
-        <p>Check the employees.json file.</p>
-      </main>
-    )
+  async function complete(employeeId, eventId) {
+    if (mutation.current) throw new Error('Another update is in progress. Please wait.')
+    mutation.current = true
+    setBusy(true)
+    try {
+      const result = await api.complete(employeeId, eventId)
+      setHrRevision((value) => value + 1)
+      return result
+    } finally {
+      mutation.current = false
+      setBusy(false)
+    }
   }
 
-  const initials = employee.full_name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join('')
+  async function importFiles(files) {
+    if (mutation.current) throw new Error('Another update is in progress. Please wait.')
+    mutation.current = true
+    setBusy(true)
+    try {
+      const result = await api.importFiles(files)
+      // Keep the selected ID while the list refreshes; fall back only if it disappeared.
+      setSelection(selectedId)
+      list.retry()
+      setRevision((value) => value + 1)
+      setHrRevision((value) => value + 1)
+      return result
+    } finally {
+      mutation.current = false
+      setBusy(false)
+    }
+  }
 
-  const firstName = employee.full_name.split(' ')[0]
+  if (!demoEntered) return <LoginPage onDemo={(view) => {
+    setActiveView(view)
+    setDemoEntered(true)
+  }} />
 
   return (
     <div className="cq-app">
@@ -89,6 +85,7 @@ if (!demoEntered) {
             type="button"
             className={activeView === 'employee' ? 'is-active' : ''}
             aria-pressed={activeView === 'employee'}
+            disabled={busy}
             onClick={() => setActiveView('employee')}
           >
             My growth
@@ -98,6 +95,7 @@ if (!demoEntered) {
             type="button"
             className={activeView === 'hr' ? 'is-active' : ''}
             aria-pressed={activeView === 'hr'}
+            disabled={busy}
             onClick={() => setActiveView('hr')}
           >
             HR overview
@@ -105,169 +103,83 @@ if (!demoEntered) {
         </nav>
 
         <button
-  className="cq-exit-demo"
-  type="button"
-  onClick={() => setDemoEntered(false)}
-         >
-  Exit demo
-</button>
+          className="cq-exit-demo"
+          type="button"
+          disabled={busy}
+          onClick={() => setDemoEntered(false)}
+        >
+          Exit demo
+        </button>
       </header>
 
       <main id="main-content" className="cq-workspace">
         {activeView === 'hr' ? (
-          <HrDashboard />
+          <div className="hr-dashboard">
+            <DataImport onImport={importFiles} busy={busy} />
+            <HrDashboard key={hrRevision} />
+          </div>
         ) : (
           <>
             <section className="cq-welcome">
               <div>
                 <p className="eyebrow">YOUR DEVELOPMENT SPACE</p>
-                <h1>What’s next for {firstName}?</h1>
-                <p>
-                  See where you are, explore your next step,
-                  and make progress at your own pace.
-                </p>
+                <h1>{employee ? `What’s next for ${employee.full_name.split(' ')[0]}?` : 'Your next chapter'}</h1>
+                <p>See where you are, explore your next step, and make progress at your own pace.</p>
               </div>
-
-              <a className="cq-jump-button" href="#next-steps">
-                Explore next steps <span aria-hidden="true">↓</span>
-              </a>
+              <a className="cq-jump-button" href="#next-steps">Explore next steps ↓</a>
             </section>
-
-            <section
-              className="cq-person-picker"
-              aria-label="Choose an employee profile"
-            >
-              <div className="cq-picker-field">
-                <label htmlFor="employee-search">Find a profile</label>
-                <input
-                  id="employee-search"
-                  type="search"
-                  placeholder="Search name, role or employee ID"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-              </div>
-
-              <div className="cq-picker-field">
-                <label htmlFor="employee-select">Selected employee</label>
-                <select
-                  id="employee-select"
-                  value={selectedId}
-                  onChange={(event) => setSelectedId(event.target.value)}
+            {!list.data ? <ApiState resource={list} label="employee list" /> : employees.length === 0 ? (
+              <section className="card"><h2>No employee profiles available</h2><p>Open HR overview to import employee data.</p></section>
+            ) : (
+              <>
+                <section
+                  className="cq-person-picker"
+                  aria-label="Choose an employee profile"
                 >
-                  {selectableEmployees.map((person) => (
-                    <option
-                      key={person.employee_id}
-                      value={person.employee_id}
+                  <div className="cq-picker-field">
+                    <label htmlFor="employee-search">Find a profile</label>
+                    <input
+                      id="employee-search"
+                      type="search"
+                      placeholder="Search name, role or employee ID"
+                      value={search}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                  </div>
+
+                  <div className="cq-picker-field">
+                    <label htmlFor="employee-select">Selected employee</label>
+                    <select
+                      id="employee-select"
+                      disabled={busy}
+                      value={selectedId}
+                      onChange={(event) => setSelection(event.target.value)}
                     >
-                      {person.full_name} · {person.employee_id}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <p className="cq-search-status" role="status">
-                {query
-                  ? `${matchingEmployees.length} matching profiles.`
-                  : `${employees.length} synthetic employee profiles.`}
-                {query && matchingEmployees.length === 0
-                  ? ' Your current selection is unchanged.'
-                  : ''}
-              </p>
-            </section>
-
-            <div className="cq-dashboard">
-              <aside className="cq-profile-column">
-                <section className="cq-profile">
-                  <div className="cq-avatar" aria-hidden="true">
-                    {initials}
+                      {selectableEmployees.map((person) => (
+                        <option
+                          key={person.employee_id}
+                          value={person.employee_id}
+                        >
+                          {person.full_name} · {person.employee_id}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <h2>{employee.full_name}</h2>
-                  <p className="cq-profile-role">{employee.role}</p>
-                  <span className="cq-grade">{employee.grade}</span>
-
-                  <dl className="cq-profile-facts">
-                    <div>
-                      <dt>Department</dt>
-                      <dd>{employee.department}</dd>
-                    </div>
-
-                    <div>
-                      <dt>Time at company</dt>
-                      <dd>{employee.tenure_months} months</dd>
-                    </div>
-
-                    <div>
-                      <dt>Work format</dt>
-                      <dd>{employee.work_format}</dd>
-                    </div>
-                  </dl>
-
-                  <div className="cq-goal">
-                    <span className="cq-goal-label">CAREER GOAL</span>
-                    <strong>
-                      {employee.career_goal
-                        ? employee.career_goal.target_grade
-                        : 'Not set yet'}
-                    </strong>
-                    {employee.career_goal && (
-                      <span>{employee.career_goal.target_role}</span>
-                    )}
-                  </div>
+                  <p className="cq-search-status" role="status">
+                    {query
+                      ? `${matchingEmployees.length} matching profiles.`
+                      : `${employees.length} synthetic employee profiles.`}
+                    {query && matchingEmployees.length === 0
+                      ? ' Your current selection is unchanged.'
+                      : ''}
+                  </p>
                 </section>
 
-                <details
-                  className="card cq-assessment"
-                  key={employee.employee_id}
-                >
-                  <summary className="skills-summary">
-                    Assessed skills
-                    <span className="skills-count">
-                      {Object.keys(employee.skills).length}
-                    </span>
-                  </summary>
-
-                  <p className="assessment-note">
-                    Assessment: {employee.last_review_date}.
-                    Later activity gains are not included yet.
-                  </p>
-
-                  <div className="skills-list">
-                    {Object.entries(employee.skills).map(
-                      ([skillId, level]) => (
-                        <div className="skill" key={skillId}>
-                          <div className="skill-heading">
-                            <label htmlFor={`assessed-${skillId}`}>
-                              {skillNames[skillId] ?? skillId}
-                            </label>
-                            <strong>{level} / 5</strong>
-                          </div>
-
-                          <progress
-                            id={`assessed-${skillId}`}
-                            value={level}
-                            max="5"
-                          />
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </details>
-              </aside>
-
-              <div className="cq-main-column">
-                <GrowthMilestones
-                  key={employee.employee_id}
-                  employee={employee}
-                />
-                <div id="next-steps" className="cq-anchor">
-                  <Recommendations />
-                </div>
-
-                <CareerTrajectory employee={employee} />
-              </div>
-            </div>
+                <EmployeeDashboard key={`${selectedId}:${revision}`} employeeId={selectedId}
+                  department={employee.department} onComplete={complete} busy={busy} />
+              </>
+            )}
           </>
         )}
       </main>

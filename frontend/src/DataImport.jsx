@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 const allowedNames = [
   'employees.json',
@@ -7,7 +7,8 @@ const allowedNames = [
   'activity_history.csv',
 ]
 
-function DataImport({ onImport }) {
+function DataImport({ onImport, busy = false }) {
+  const pending = useRef(false)
   const [files, setFiles] = useState([])
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
@@ -47,7 +48,9 @@ function DataImport({ onImport }) {
   async function handleSubmit(event) {
     event.preventDefault()
 
-    if (!files.length || !onImport || uploading) return
+    if (!files.length || !onImport || uploading || busy || pending.current) return
+
+    pending.current = true
 
     setUploading(true)
     setError('')
@@ -63,6 +66,7 @@ function DataImport({ onImport }) {
           : 'Import failed. Please try again.',
       )
     } finally {
+      pending.current = false
       setUploading(false)
     }
   }
@@ -88,7 +92,7 @@ function DataImport({ onImport }) {
           type="file"
           accept=".json,.csv"
           multiple
-          disabled={uploading}
+          disabled={uploading || busy}
           onChange={handleSelection}
           aria-describedby="accepted-files"
         />
@@ -129,7 +133,7 @@ function DataImport({ onImport }) {
         <button
           className="complete-button import-button"
           type="submit"
-          disabled={!files.length || !onImport || uploading}
+          disabled={!files.length || !onImport || uploading || busy}
         >
           {uploading ? 'Importing…' : 'Import selected files'}
         </button>
