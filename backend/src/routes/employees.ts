@@ -1,11 +1,9 @@
 import { Router } from "express";
-import { getHrOverview } from "../services/hr-service.js";
 
 import { HttpError } from "../domain/errors.js";
 import { getEmployeeProfile } from "../services/profile-service.js";
 import { completeActivity } from "../services/completion-service.js";
 import {
-  getEmployeeRecommendations,
   getEmployeeRecommendationsWithExplanations,
 } from "../services/recommendation-service.js";
 import type { RecommendationExplanationProvider } from "../services/recommendation-explanation-provider.js";
@@ -16,14 +14,6 @@ export function createEmployeeRouter(
   explanationProvider: RecommendationExplanationProvider | undefined,
 ): Router {
   const router = Router();
-
-  router.get("/hr/overview", (_request, response, next) => {
-    try {
-      response.status(200).json(getHrOverview(datasetStore.get()));
-    } catch (error) {
-      next(error);
-    }
-  });
 
   router.get("/employees", (_request, response) => {
     const employees = datasetStore.get().dataset.employees.map((employee) => ({
@@ -63,7 +53,7 @@ export function createEmployeeRouter(
       return;
     }
     try {
-      response.status(201).json(completeActivity(datasetStore, request.params.employeeId, request.body.event_id));
+      response.status(201).json(completeActivity(datasetStore, request.params.employeeId, request.body.event_id, request.body.session_date));
     } catch (error) {
       next(error);
     }
@@ -72,7 +62,8 @@ export function createEmployeeRouter(
   return router;
 }
 
-function isCompletionRequest(body: unknown): body is { event_id: string } {
+function isCompletionRequest(body: unknown): body is { event_id: string; session_date?: string } {
   return typeof body === "object" && body !== null && "event_id" in body &&
-    typeof body.event_id === "string" && body.event_id.trim() !== "";
+    typeof body.event_id === "string" && body.event_id.trim() !== "" &&
+    (!("session_date" in body) || typeof body.session_date === "string");
 }

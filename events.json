@@ -1214,6 +1214,7 @@
     },
     {
       "event_id": "EV_036",
+      "recurring": true,
       "title": "Public Speaking Club",
       "description": "Recurring club where members give short talks and get feedback. Can be attended repeatedly.",
       "type": "meetup",

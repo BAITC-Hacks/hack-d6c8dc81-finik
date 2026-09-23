@@ -57,7 +57,7 @@ function GrowthMilestones({ employee, celebration = 0 }) {
         >
           <div className="growth-ring-inner">
             <strong>{percentage}%</strong>
-            <span>skills met</span>
+            <span>Target requirements met</span>
           </div>
         </div>
 

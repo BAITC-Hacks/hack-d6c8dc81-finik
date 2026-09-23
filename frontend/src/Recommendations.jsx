@@ -54,6 +54,9 @@ function Recommendations({
                 {recommendation.next_session && ` · Next session: ${recommendation.next_session}`}
               </p>
 
+              <span className="assessment-note">
+                {recommendation.explanation_source === 'ai' ? 'AI-assisted explanation · verified facts' : 'Rule-based explanation'}
+              </span>
               <p className="recommendation-explanation">
                 {recommendation.explanation}
               </p>
@@ -63,8 +66,8 @@ function Recommendations({
                   <div className="impact-row" key={skill.skill_id}>
                     <div>
                       <strong>{skill.name}</strong>
-                      <span>Target level: {skill.required_level}</span>
-                      <span>Gain: {skill.gain} · Maximum level: {skill.max_level}</span>
+                      <span>Role target level: {skill.required_level}</span>
+                      <span>Gain: {skill.gain} · Activity can develop this skill up to level {skill.max_level}</span>
                       {skill.critical && <span className="critical-tag">Critical for promotion</span>}
                     </div>
 
@@ -95,14 +98,14 @@ function Recommendations({
                 className="complete-button"
                 type="button"
                 disabled={
-                  !onComplete ||
+                  !onComplete || recommendation.can_complete === false ||
                   completingEventId !== null
                 }
-                onClick={() => onComplete?.(recommendation.event_id)}
+                onClick={() => onComplete?.(recommendation.event_id, recommendation.recurring ? recommendation.next_session : undefined)}
               >
                 {completingEventId === recommendation.event_id
                   ? 'Saving…'
-                  : 'Mark completed'}
+                  : recommendation.can_complete === false ? 'Session not yet completable' : 'Mark completed'}
               </button>
 
             </article>

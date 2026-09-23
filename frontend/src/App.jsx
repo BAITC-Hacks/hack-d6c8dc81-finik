@@ -30,12 +30,12 @@ function App() {
   const selectableEmployees = employee && !matchingEmployees.includes(employee)
     ? [employee, ...matchingEmployees] : matchingEmployees
 
-  async function complete(employeeId, eventId) {
+  async function complete(employeeId, eventId, sessionDate) {
     if (mutation.current) throw new Error('Another update is in progress. Please wait.')
     mutation.current = true
     setBusy(true)
     try {
-      const result = await api.complete(employeeId, eventId)
+      const result = await api.complete(employeeId, eventId, sessionDate)
       setHrRevision((value) => value + 1)
       return result
     } finally {

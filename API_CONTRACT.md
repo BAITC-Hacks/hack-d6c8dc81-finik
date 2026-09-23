@@ -102,6 +102,9 @@ Response:
       "duration_hours": 3,
       "next_session": "2026-10-12",
       "score": 12.5,
+      "recurring": false,
+      "can_complete": true,
+      "explanation_source": "rules",
       "explanation": "System Design is 2/4 for Senior. This activity can raise it by 1; it is critical for promotion. Participation history was also considered.",
       "factors": {
         "current_grade": "Middle",
@@ -127,6 +130,29 @@ Response:
 ```
 
 There are **0–3** recommendations, sorted by rank. An empty list is valid. The backend excludes mandatory activities, unmet prerequisites, unavailable sessions, and previously completed non-recurring activities. Ranking considers at least grade, skill gaps, next-grade requirements and participation history. `score` is useful for debugging; the frontend displays the explanation and factors, and never calculates or changes the score. Any LLM wording must be based on these computed facts and must have a deterministic fallback.
+
+### Explanation and session metadata (additive)
+
+Each recommendation includes `explanation_source: "ai" | "rules"`. `ai` means
+AI-selected approved fact references rendered as English by the backend; arbitrary
+model prose is never displayed. `rules` means the deterministic `buildExplanation()`
+fallback. Existing `explanation`, ranks, scores, factors, and numeric skill impacts
+remain authoritative and compatible. Clients of older servers may default a missing
+source to `rules`.
+
+`recurring` defaults to false. `can_complete` is backend-calculated; the frontend
+disables completion when false. For recurring activities, `next_session` is the
+earliest listed uncompleted occurrence, including a past due occurrence. Only
+sessions on/before the dataset snapshot can be completed. Future sessions can be
+recommended for planning without allowing early skill gains. Non-recurring demo
+completion behavior remains unchanged.
+
+AI requests have a 4.5-second deadline and no retries; missing keys, timeout,
+provider errors, malformed/partial responses, invalid IDs or unsupported fact
+references retain rules. Successful results are cached for 15 minutes, at most
+128 entries per provider, with at most 16 distinct in-flight requests; identical
+requests share work. Keys include model, prompt version and all supplied facts.
+HR and empty recommendation lists never request AI.
 
 ## 4. Complete an activity
 
@@ -160,7 +186,38 @@ Response (HTTP 201):
 }
 ```
 
-`profile` has exactly the shape from endpoint 2; `recommendations` is the array from endpoint 3. The backend records the completion and applies `min(5, event.max_level, old_level + event.gain)`. A repeated completion of a non-recurring event returns HTTP 409 and changes nothing. The frontend replaces displayed profile and recommendation cards with the returned values.
+`profile` has exactly the shape from endpoint 2; `recommendations` is the array from endpoint 3. The backend records the completion and applies `max(old_level, min(5, event.max_level, old_level + event.gain))`. A repeated completion of a non-recurring event returns HTTP 409 and changes nothing. The frontend replaces displayed profile and recommendation cards with the returned values.
+
+The corrected gain formula supersedes the previous `min(...)` formula: an activity's
+cap limits new learning, never reduces a valid existing level. The same helper is
+used for history reconstruction, recommendation impacts, and completion changes.
+
+Completion returns confirmed progress and rule-based recommendations immediately,
+without waiting for AI. The frontend then requests endpoint 3 and applies only
+explanation text/source if the recommendation facts still match. An AI/network
+refresh failure leaves confirmed progress intact. New completions and employee
+switches cancel/ignore older refreshes.
+
+### Recurring participation extension
+
+The starter schema previously named a recurring exception only in README prose.
+`events.json` now accepts optional `recurring: boolean` (default false); the named
+starter club is explicitly marked in data, with no event-ID checks in application
+logic. Recurring activities must be scheduled (not self-paced). Their existing
+`upcoming_sessions` field is an explicit catalog of distinct session dates; for
+recurring events it may retain past dates as well as future ones.
+
+For a recurring activity, send `{ "event_id": "...", "session_date": "YYYY-MM-DD" }`.
+The date must be listed and on/before the snapshot. Missing, future, or unlisted
+dates return HTTP 400 `INVALID_SESSION`. Non-recurring activities reject a supplied
+session date. Repeating the same employee/event/session returns HTTP 409 without
+mutation; different due sessions may be completed separately. `completed_on` and
+the history row's `date` are that session date. History effects are deduplicated by
+`(employee_id, event_id, date)`, even when imported records have different IDs.
+Only occurrences after `last_review_date` award gains; earlier occurrences are
+already covered by the assessment and return no skill changes. Session dates are
+not inferred from names/descriptions. Multiple occurrences of an event on the
+same day are unsupported by this date-only schema.
 
 ## 5. HR overview
 

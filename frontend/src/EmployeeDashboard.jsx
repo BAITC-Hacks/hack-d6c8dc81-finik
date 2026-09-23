@@ -3,8 +3,10 @@ import { api } from './api'
 import { useApiResource } from './useApiResource'
 import ApiState from './ApiState'
 import CareerTrajectory from './CareerTrajectory'
+import TargetSkill from './TargetSkill'
 import GrowthMilestones from './GrowthMilestones'
 import Recommendations from './Recommendations'
+import { mergeExplanationRefresh } from './explanationRefresh'
 
 const loadEmployee = async (id, signal) => {
   const [profile, result] = await Promise.all([
@@ -18,23 +20,45 @@ export default function EmployeeDashboard({ employeeId, department, onComplete, 
   const [completingEventId, setCompletingEventId] = useState(null)
   const [completionError, setCompletionError] = useState('')
   const [celebration, setCelebration] = useState(0)
+  const [explanationStatus, setExplanationStatus] = useState('')
+  const refresh = useRef(null)
   const mounted = useRef(false)
   const submitting = useRef(false)
   useEffect(() => {
     mounted.current = true
-    return () => { mounted.current = false }
+    return () => { mounted.current = false; refresh.current?.abort() }
   }, [])
 
-  async function complete(eventId) {
+  async function complete(eventId, sessionDate) {
     if (submitting.current || busy) return
+    refresh.current?.abort()
+    setExplanationStatus('')
     submitting.current = true
     setCompletingEventId(eventId)
     setCompletionError('')
     try {
-      const response = await onComplete(employeeId, eventId)
+      const response = await onComplete(employeeId, eventId, sessionDate)
       if (!mounted.current) return
       resource.replace({ profile: response.profile, recommendations: response.recommendations })
       setCelebration((value) => value + 1)
+      // Confirmation is already saved. A wording failure must never enter the completion catch.
+      if (response.recommendations.length) {
+        const controller = new AbortController()
+        refresh.current = controller
+        setExplanationStatus('Progress saved. Refreshing explanation wording…')
+        api.recommendations(employeeId, controller.signal).then((result) => {
+          if (!mounted.current || controller.signal.aborted || refresh.current !== controller) return
+          resource.replace({
+            profile: response.profile,
+            recommendations: mergeExplanationRefresh(response.recommendations, result.recommendations),
+          })
+          setExplanationStatus('')
+        }).catch(() => {
+          if (mounted.current && !controller.signal.aborted && refresh.current === controller) {
+            setExplanationStatus('Progress saved. Explanation refresh unavailable; rule-based explanations are shown.')
+          }
+        })
+      }
     } catch (error) {
       if (mounted.current) setCompletionError(error.message)
     } finally {
@@ -93,28 +117,14 @@ export default function EmployeeDashboard({ employeeId, department, onComplete, 
           </summary>
 
           <p className="assessment-note">
-            Includes completed activity gains calculated by the backend.
+            Skills use a 0–5 proficiency scale; each role and grade can require a different target level.
+            Includes completed activity gains.
           </p>
 
           <div className="skills-list">
-            {employee.skills.map(
-              ({ skill_id: skillId, name, current_level: level }) => (
-                <div className="skill" key={skillId}>
-                  <div className="skill-heading">
-                    <label htmlFor={`assessed-${skillId}`}>
-                      {name}
-                    </label>
-                    <strong>{level} / 5</strong>
-                  </div>
-
-                  <progress
-                    id={`assessed-${skillId}`}
-                    value={level}
-                    max="5"
-                  />
-                </div>
-              ),
-            )}
+            {employee.skills.map((skill) => (
+              <TargetSkill key={skill.skill_id} skill={skill} idPrefix="assessed" />
+            ))}
           </div>
         </details>
       </aside>
@@ -126,6 +136,7 @@ export default function EmployeeDashboard({ employeeId, department, onComplete, 
           celebration={celebration}
         />
         <div id="next-steps" className="cq-anchor">
+          {explanationStatus && <p className="assessment-note" role="status">{explanationStatus}</p>}
           <Recommendations recommendations={recommendations}
             completingEventId={completingEventId ?? (busy ? 'pending' : null)} onComplete={complete}
             completionError={completionError} />

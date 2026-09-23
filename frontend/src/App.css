@@ -1554,3 +1554,8 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+/* Target labels wrap within the narrow profile column. */
+.target-skill .skill-heading {
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}

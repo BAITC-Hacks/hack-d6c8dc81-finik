@@ -121,7 +121,7 @@ describe("GET /api/employees", () => {
     });
     for (const recommendation of response.body.recommendations) {
       expect(Object.keys(recommendation).sort()).toEqual([
-        "duration_hours", "event_id", "explanation", "factors", "format", "next_session", "rank", "score", "title", "type",
+        "can_complete", "duration_hours", "event_id", "explanation", "explanation_source", "factors", "format", "next_session", "rank", "recurring", "score", "title", "type",
       ]);
       expect(recommendation).toMatchObject({
         rank: expect.any(Number), event_id: expect.any(String), title: expect.any(String), type: expect.any(String),
