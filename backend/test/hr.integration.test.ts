@@ -4,6 +4,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { ActiveDatasetStore, loadDatasetFromDirectory } from "../src/services/dataset-service.js";
+import { getEmployeeRecommendations } from "../src/services/recommendation-service.js";
 
 const dataDir = fileURLToPath(new URL("../../", import.meta.url));
 
@@ -12,7 +13,13 @@ describe("HR overview integration", () => {
   let store: ActiveDatasetStore;
   beforeEach(async () => {
     store = new ActiveDatasetStore(await loadDatasetFromDirectory(resolve(dataDir)));
-    app = createApp({ port: 8000, corsOrigin: "http://localhost:5173", dataDir }, store);
+    app = createApp({
+      port: 8000,
+      corsOrigin: "http://localhost:5173",
+      dataDir,
+      openAiApiKey: undefined,
+      openAiModel: "gpt-5-mini",
+    }, store);
   });
 
   it("reports dataset counts, ordered gaps, participation and actual employees without recommendations", async () => {
@@ -62,4 +69,63 @@ describe("HR overview integration", () => {
     const afterFailure = await request(app).get("/api/hr/overview").expect(200);
     expect(afterFailure.body).toEqual(imported.body);
   });
+
+  it("returns the exact contract response shape", async () => {
+    const response = await request(app).get("/api/hr/overview").expect(200);
+
+    expect(Object.keys(response.body).sort()).toEqual([
+      "completed_activity_count",
+      "employee_count",
+      "employees_without_step",
+      "participation_by_event",
+      "top_skill_gaps",
+    ]);
+    expect(response.body).toMatchObject({
+      employee_count: expect.any(Number),
+      completed_activity_count: expect.any(Number),
+      top_skill_gaps: expect.any(Array),
+      participation_by_event: expect.any(Array),
+      employees_without_step: expect.any(Array),
+    });
+    expect(response.body.top_skill_gaps[0]).toEqual({
+      skill_id: expect.any(String),
+      name: expect.any(String),
+      employee_count: expect.any(Number),
+    });
+    expect(response.body.participation_by_event[0]).toEqual({
+      event_id: expect.any(String),
+      title: expect.any(String),
+      completed: expect.any(Number),
+      no_show: expect.any(Number),
+      dropped: expect.any(Number),
+    });
+    for (const employee of response.body.employees_without_step) {
+      expect(employee).toEqual({
+        employee_id: expect.any(String),
+        full_name: expect.any(String),
+        role: expect.any(String),
+        grade: expect.any(String),
+      });
+    }
+  });
+
+  it("serves deterministic recommendations and completes activities without an API key", async () => {
+    const employeeId = store.get().dataset.employees[0].employee_id;
+    const deterministic = getEmployeeRecommendations(store.get(), employeeId);
+    expect(deterministic.recommendations.length).toBeGreaterThan(0);
+
+    const recommendations = await request(app).get(`/api/employees/${employeeId}/recommendations`).expect(200);
+    expect(recommendations.body).toEqual(deterministic);
+
+    const completion = await request(app).post(`/api/employees/${employeeId}/complete`)
+      .send({ event_id: deterministic.recommendations[0].event_id }).expect(201);
+    const updated = getEmployeeRecommendations(store.get(), employeeId);
+    expect(completion.body.recommendations).toEqual(updated.recommendations);
+    expect(completion.body.profile.history).toContainEqual(expect.objectContaining({
+      record_id: completion.body.record_id, status: "completed",
+    }));
+    const refreshed = await request(app).get(`/api/employees/${employeeId}/recommendations`).expect(200);
+    expect(refreshed.body).toEqual(updated);
+  });
+
 });

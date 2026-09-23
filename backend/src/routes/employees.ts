@@ -4,10 +4,17 @@ import { getHrOverview } from "../services/hr-service.js";
 import { HttpError } from "../domain/errors.js";
 import { getEmployeeProfile } from "../services/profile-service.js";
 import { completeActivity } from "../services/completion-service.js";
-import { getEmployeeRecommendations } from "../services/recommendation-service.js";
+import {
+  getEmployeeRecommendations,
+  getEmployeeRecommendationsWithExplanations,
+} from "../services/recommendation-service.js";
+import type { RecommendationExplanationProvider } from "../services/recommendation-explanation-provider.js";
 import type { ActiveDatasetStore } from "../services/dataset-service.js";
 
-export function createEmployeeRouter(datasetStore: ActiveDatasetStore): Router {
+export function createEmployeeRouter(
+  datasetStore: ActiveDatasetStore,
+  explanationProvider: RecommendationExplanationProvider | undefined,
+): Router {
   const router = Router();
 
   router.get("/hr/overview", (_request, response, next) => {
@@ -38,9 +45,13 @@ export function createEmployeeRouter(datasetStore: ActiveDatasetStore): Router {
     }
   });
 
-  router.get("/employees/:employeeId/recommendations", (request, response, next) => {
+  router.get("/employees/:employeeId/recommendations", async (request, response, next) => {
     try {
-      response.status(200).json(getEmployeeRecommendations(datasetStore.get(), request.params.employeeId));
+      response.status(200).json(await getEmployeeRecommendationsWithExplanations(
+        datasetStore.get(),
+        request.params.employeeId,
+        explanationProvider,
+      ));
     } catch (error) {
       next(error);
     }
