@@ -96,4 +96,39 @@ describe("GET /api/employees", () => {
       error: { code: "EMPLOYEE_NOT_FOUND", message: "Employee E_UNKNOWN was not found." },
     });
   });
+
+  it("returns the contract recommendation shape for a real employee", async () => {
+    const response = await request(app).get("/api/employees/E0001/recommendations").expect(200);
+
+    expect(Object.keys(response.body).sort()).toEqual([
+      "employee_id",
+      "recommendations",
+      "target_grade",
+      "target_role",
+    ]);
+    expect(response.body).toMatchObject({
+      employee_id: "E0001",
+      target_role: "Backend Engineer",
+      target_grade: "Middle",
+    });
+    for (const recommendation of response.body.recommendations) {
+      expect(Object.keys(recommendation).sort()).toEqual([
+        "duration_hours", "event_id", "explanation", "factors", "format", "next_session", "rank", "score", "title", "type",
+      ]);
+      expect(recommendation).toMatchObject({
+        rank: expect.any(Number), event_id: expect.any(String), title: expect.any(String), type: expect.any(String),
+        format: expect.any(String), duration_hours: expect.any(Number), score: expect.any(Number), explanation: expect.any(String),
+        factors: { current_grade: expect.any(String), target_grade: expect.any(String), skill_impacts: expect.any(Array), completed_similar: expect.any(Number), missed_or_declined_similar: expect.any(Number) },
+      });
+      expect(recommendation.next_session === null || typeof recommendation.next_session === "string").toBe(true);
+    }
+  });
+
+  it("returns a contract-compatible 404 for recommendation requests with unknown employees", async () => {
+    const response = await request(app).get("/api/employees/E_UNKNOWN/recommendations").expect(404);
+
+    expect(response.body).toEqual({
+      error: { code: "EMPLOYEE_NOT_FOUND", message: "Employee E_UNKNOWN was not found." },
+    });
+  });
 });
