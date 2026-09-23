@@ -5,6 +5,8 @@ export interface AppConfig {
   port: number;
   corsOrigin: string;
   dataDir: string;
+  openAiApiKey: string | undefined;
+  openAiModel: string;
 }
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
@@ -28,5 +30,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     port: readPort(env.PORT),
     corsOrigin: env.CORS_ORIGIN?.trim() || "http://localhost:5173",
     dataDir: env.DATA_DIR?.trim() || defaultDataDir,
+    openAiApiKey: env.OPENAI_API_KEY,
+    openAiModel: env.OPENAI_MODEL?.trim() || "gpt-5-mini",
   };
 }

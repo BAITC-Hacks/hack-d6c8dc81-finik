@@ -1,6 +1,11 @@
 import { HttpError } from "../domain/errors.js";
 import type { ActiveDataset, ActivityHistoryRecord, Employee, Event, Grade, RoleProfile } from "../domain/types.js";
 import { reconstructCurrentSkills, resolveTargetProfile } from "./profile-service.js";
+import {
+  parseExplanationResponse,
+  type RecommendationExplanationProvider,
+  type RecommendationExplanationRequest,
+} from "./recommendation-explanation-provider.js";
 
 const SCORE_WEIGHTS = {
   effectiveGain: 10,
@@ -331,4 +336,74 @@ export function getEmployeeRecommendations(
       factors: candidate.factors,
     })),
   };
+}
+
+function buildExplanationRequest(
+  activeDataset: ActiveDataset,
+  response: EmployeeRecommendationsResponse,
+): RecommendationExplanationRequest {
+  const employee = activeDataset.indexes.employeesById.get(response.employee_id);
+  if (!employee) {
+    throw new Error(`Employee ${response.employee_id} disappeared from the active dataset.`);
+  }
+
+  return {
+    employee: {
+      current_role: employee.role,
+      current_grade: employee.grade,
+      target_role: response.target_role,
+      target_grade: response.target_grade,
+    },
+    recommendations: response.recommendations.map((recommendation) => ({
+      event_id: recommendation.event_id,
+      activity_title: recommendation.title,
+      activity_type: recommendation.type,
+      skill_impacts: recommendation.factors.skill_impacts.map((impact) => ({
+        skill_name: impact.name,
+        current_level: impact.current_level,
+        required_level: impact.required_level,
+        expected_level: impact.expected_level,
+        critical: impact.critical,
+      })),
+      completed_similar: recommendation.factors.completed_similar,
+      missed_or_declined_similar: recommendation.factors.missed_or_declined_similar,
+    })),
+  };
+}
+
+/**
+ * Optional presentation layer over the synchronous deterministic engine. It
+ * never changes candidates, scores, ranks, or factors; any provider problem
+ * leaves the established deterministic explanations in place.
+ */
+export async function getEmployeeRecommendationsWithExplanations(
+  activeDataset: ActiveDataset,
+  employeeId: string,
+  explanationProvider: RecommendationExplanationProvider | undefined,
+): Promise<EmployeeRecommendationsResponse> {
+  const deterministicResponse = getEmployeeRecommendations(activeDataset, employeeId);
+  if (!explanationProvider || deterministicResponse.recommendations.length === 0) {
+    return deterministicResponse;
+  }
+
+  try {
+    const selectedEventIds = new Set(deterministicResponse.recommendations.map((item) => item.event_id));
+    const generated = await explanationProvider.generateExplanations(
+      buildExplanationRequest(activeDataset, deterministicResponse),
+    );
+    const explanations = parseExplanationResponse(generated, selectedEventIds);
+    if (explanations.size === 0) {
+      return deterministicResponse;
+    }
+
+    return {
+      ...deterministicResponse,
+      recommendations: deterministicResponse.recommendations.map((recommendation) => ({
+        ...recommendation,
+        explanation: explanations.get(recommendation.event_id) ?? recommendation.explanation,
+      })),
+    };
+  } catch {
+    return deterministicResponse;
+  }
 }
