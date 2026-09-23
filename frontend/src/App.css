@@ -1,0 +1,209 @@
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: #197459;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+h1 {
+  max-width: 680px;
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.3;
+}
+
+.subtitle {
+  margin: 14px 0 0;
+  color: #596d68;
+}
+
+.dataset-label {
+  padding: 8px 12px;
+  border: 1px solid #ccdad5;
+  border-radius: 8px;
+  color: #52685e;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.card {
+  padding: 28px;
+  border: 1px solid #dce6e1;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.employee-picker {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.employee-picker label {
+  font-weight: 700;
+}
+
+.employee-picker select {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #bccfc5;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #163c30;
+  font: inherit;
+}
+
+.employee-picker select:focus-visible {
+  outline: 3px solid #248365;
+  outline-offset: 3px;
+}
+
+.profile-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.profile-card {
+  background: #123e32;
+  color: #ffffff;
+}
+
+.profile-card .eyebrow {
+  color: #b5e7b4;
+}
+
+.role {
+  margin: 10px 0 18px;
+  color: #d2e4dc;
+}
+
+.grade-badge {
+  display: inline-block;
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: #bfeaa1;
+  color: #173c2b;
+  font-weight: 700;
+}
+
+.profile-details {
+  margin: 28px 0 0;
+}
+
+.profile-details div {
+  padding: 16px 0;
+  border-top: 1px solid #416357;
+}
+
+.profile-details dt {
+  margin-bottom: 5px;
+  color: #c3d8cf;
+  font-size: 0.9rem;
+}
+
+.profile-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.section-heading span {
+  color: #596d68;
+  white-space: nowrap;
+}
+
+.assessment-note {
+  margin: 12px 0 24px;
+  color: #596d68;
+  font-size: 0.9rem;
+}
+
+.skills-list {
+  display: grid;
+  gap: 22px;
+}
+
+.skill-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 9px;
+}
+
+.skill-heading strong {
+  white-space: nowrap;
+}
+
+.skill progress {
+  display: block;
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 10px;
+  background: #e5eee8;
+  appearance: none;
+}
+
+.skill progress::-webkit-progress-bar {
+  border-radius: 10px;
+  background: #e5eee8;
+}
+
+.skill progress::-webkit-progress-value {
+  border-radius: 10px;
+  background: #248365;
+}
+
+.skill progress::-moz-progress-bar {
+  border-radius: 10px;
+  background: #248365;
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 28px 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+  }
+
+  .profile-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 22px;
+  }
+}
