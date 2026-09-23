@@ -1,6 +1,8 @@
 import { Router } from "express";
 
+import { HttpError } from "../domain/errors.js";
 import { getEmployeeProfile } from "../services/profile-service.js";
+import { completeActivity } from "../services/completion-service.js";
 import { getEmployeeRecommendations } from "../services/recommendation-service.js";
 import type { ActiveDatasetStore } from "../services/dataset-service.js";
 
@@ -35,5 +37,22 @@ export function createEmployeeRouter(datasetStore: ActiveDatasetStore): Router {
     }
   });
 
+  router.post("/employees/:employeeId/complete", (request, response, next) => {
+    if (!isCompletionRequest(request.body)) {
+      next(new HttpError(400, "INVALID_REQUEST", "Request body must contain a non-empty event_id string."));
+      return;
+    }
+    try {
+      response.status(201).json(completeActivity(datasetStore, request.params.employeeId, request.body.event_id));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   return router;
+}
+
+function isCompletionRequest(body: unknown): body is { event_id: string } {
+  return typeof body === "object" && body !== null && "event_id" in body &&
+    typeof body.event_id === "string" && body.event_id.trim() !== "";
 }

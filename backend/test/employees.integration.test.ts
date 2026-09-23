@@ -131,4 +131,48 @@ describe("GET /api/employees", () => {
       error: { code: "EMPLOYEE_NOT_FOUND", message: "Employee E_UNKNOWN was not found." },
     });
   });
+
+  it("completes an eligible recommendation and returns refreshed profile and recommendations", async () => {
+    const beforeProfile = await request(app).get("/api/employees/E0001").expect(200);
+    const beforeRecommendations = await request(app).get("/api/employees/E0001/recommendations").expect(200);
+    const eventId = beforeRecommendations.body.recommendations[0].event_id;
+    const impactedSkillId = beforeRecommendations.body.recommendations[0].factors.skill_impacts[0].skill_id;
+    const beforeSkill = beforeProfile.body.skills.find((skill: { skill_id: string }) => skill.skill_id === impactedSkillId);
+
+    const completion = await request(app)
+      .post("/api/employees/E0001/complete")
+      .send({ event_id: eventId })
+      .expect(201);
+
+    const afterSkill = completion.body.profile.skills.find((skill: { skill_id: string }) => skill.skill_id === impactedSkillId);
+    expect(completion.body).toMatchObject({
+      employee_id: "E0001",
+      event_id: eventId,
+      record_id: expect.stringMatching(/^R\d+$/),
+      status: "completed",
+      completed_on: "2026-10-01",
+      skill_changes: expect.any(Array),
+      profile: expect.any(Object),
+      recommendations: expect.any(Array),
+    });
+    expect(afterSkill.current_level).toBeGreaterThan(beforeSkill.current_level);
+    expect(completion.body.profile.history[0]).toMatchObject({ event_id: eventId, status: "completed" });
+    expect(completion.body.recommendations.some((item: { event_id: string }) => item.event_id === eventId)).toBe(false);
+  });
+
+  it("returns contract errors for invalid, duplicate, and unknown completion requests", async () => {
+    const invalid = await request(app).post("/api/employees/E0001/complete").send({}).expect(400);
+    const unknownEmployee = await request(app).post("/api/employees/E_UNKNOWN/complete").send({ event_id: "EV_005" }).expect(404);
+    const unknownEvent = await request(app).post("/api/employees/E0001/complete").send({ event_id: "EV_UNKNOWN" }).expect(404);
+    const currentProfile = await request(app).get("/api/employees/E0001").expect(200);
+    const completedEventId = currentProfile.body.history.find(
+      (item: { status: string; date: string }) => item.status === "completed" && item.date === "2026-10-01",
+    ).event_id;
+    const duplicate = await request(app).post("/api/employees/E0001/complete").send({ event_id: completedEventId }).expect(409);
+
+    expect(invalid.body.error.code).toBe("INVALID_REQUEST");
+    expect(unknownEmployee.body.error.code).toBe("EMPLOYEE_NOT_FOUND");
+    expect(unknownEvent.body.error.code).toBe("EVENT_NOT_FOUND");
+    expect(duplicate.body.error.code).toBe("EVENT_ALREADY_COMPLETED");
+  });
 });
