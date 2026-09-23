@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { getHrOverview } from "../services/hr-service.js";
 
 import { HttpError } from "../domain/errors.js";
 import { getEmployeeProfile } from "../services/profile-service.js";
@@ -15,6 +16,14 @@ export function createEmployeeRouter(
   explanationProvider: RecommendationExplanationProvider | undefined,
 ): Router {
   const router = Router();
+
+  router.get("/hr/overview", (_request, response, next) => {
+    try {
+      response.status(200).json(getHrOverview(datasetStore.get()));
+    } catch (error) {
+      next(error);
+    }
+  });
 
   router.get("/employees", (_request, response) => {
     const employees = datasetStore.get().dataset.employees.map((employee) => ({
