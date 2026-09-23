@@ -1,5 +1,7 @@
 import { Router } from "express";
 
+import { getEmployeeProfile } from "../services/profile-service.js";
+import { getEmployeeRecommendations } from "../services/recommendation-service.js";
 import type { ActiveDatasetStore } from "../services/dataset-service.js";
 
 export function createEmployeeRouter(datasetStore: ActiveDatasetStore): Router {
@@ -15,6 +17,22 @@ export function createEmployeeRouter(datasetStore: ActiveDatasetStore): Router {
     }));
 
     response.status(200).json({ employees, total: employees.length });
+  });
+
+  router.get("/employees/:employeeId", (request, response, next) => {
+    try {
+      response.status(200).json(getEmployeeProfile(datasetStore.get(), request.params.employeeId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get("/employees/:employeeId/recommendations", (request, response, next) => {
+    try {
+      response.status(200).json(getEmployeeRecommendations(datasetStore.get(), request.params.employeeId));
+    } catch (error) {
+      next(error);
+    }
   });
 
   return router;
