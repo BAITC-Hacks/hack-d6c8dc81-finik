@@ -4,4 +4,4 @@ Hackathon team repository for finik
 ## Team
 
 - Madi
-- Friend
+- Aruzhan
