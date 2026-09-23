@@ -6,18 +6,20 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { createApp } from "../src/app.js";
 import { ActiveDatasetStore, loadDatasetFromDirectory } from "../src/services/dataset-service.js";
+import type { ActiveDataset } from "../src/domain/types.js";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
 const dataDirectory = resolve(testDirectory, "../..");
 
 describe("GET /api/employees", () => {
   let app: ReturnType<typeof createApp>;
+  let initialDataset: ActiveDataset;
 
   beforeAll(async () => {
-    const activeDataset = await loadDatasetFromDirectory(dataDirectory);
+    initialDataset = await loadDatasetFromDirectory(dataDirectory);
     app = createApp(
       { port: 8000, corsOrigin: "http://localhost:5173", dataDir: dataDirectory },
-      new ActiveDatasetStore(activeDataset),
+      new ActiveDatasetStore(initialDataset),
     );
   });
 
@@ -174,5 +176,32 @@ describe("GET /api/employees", () => {
     expect(unknownEmployee.body.error.code).toBe("EMPLOYEE_NOT_FOUND");
     expect(unknownEvent.body.error.code).toBe("EVENT_NOT_FOUND");
     expect(duplicate.body.error.code).toBe("EVENT_ALREADY_COMPLETED");
+  });
+
+  it("imports an employee through multipart and serves normal employee endpoints", async () => {
+    const sourceEmployee = initialDataset.indexes.employeesById.get("E0001");
+    if (!sourceEmployee) throw new Error("Expected E0001 in starter data.");
+    const employee = { ...sourceEmployee, employee_id: "JUDGE_HTTP_001", full_name: "Imported HTTP Employee" };
+    const uploadDocument = JSON.stringify({
+      meta: { dataset: "Career Quest", version: "1.0", as_of_date: "2026-10-01" },
+      employees: [employee],
+    });
+
+    const imported = await request(app)
+      .post("/api/import")
+      .attach("files", Buffer.from(uploadDocument), "employees.json")
+      .expect(200);
+    const list = await request(app).get("/api/employees").expect(200);
+    const profile = await request(app).get("/api/employees/JUDGE_HTTP_001").expect(200);
+    const recommendations = await request(app).get("/api/employees/JUDGE_HTTP_001/recommendations").expect(200);
+
+    expect(imported.body).toEqual({
+      loaded: { employees: 1, events: 0, skills: 0, history: 0 },
+      total: { employees: 201, events: 40, skills: 60, history: 2744 },
+      imported_employee_ids: ["JUDGE_HTTP_001"],
+    });
+    expect(list.body.employees.some((item: { employee_id: string }) => item.employee_id === "JUDGE_HTTP_001")).toBe(true);
+    expect(profile.body.employee_id).toBe("JUDGE_HTTP_001");
+    expect(recommendations.body.employee_id).toBe("JUDGE_HTTP_001");
   });
 });

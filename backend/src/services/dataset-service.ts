@@ -468,13 +468,65 @@ export class ActiveDatasetStore {
   }
 }
 
-async function readJson(filePath: string, label: string): Promise<unknown> {
+export interface ParsedSkillsDocument {
+  meta: DatasetMeta;
+  skills: Skill[];
+  roleProfiles: RoleProfile[];
+}
+
+export interface ParsedEmployeesDocument {
+  meta: DatasetMeta;
+  employees: Employee[];
+}
+
+export interface ParsedEventsDocument {
+  meta: DatasetMeta;
+  events: Event[];
+}
+
+function parseJsonText(content: string, label: string): unknown {
   try {
-    return JSON.parse(await readFile(filePath, "utf8")) as unknown;
+    return JSON.parse(content) as unknown;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown JSON error";
+    fail(`Unable to parse ${label}: ${detail}`);
+  }
+}
+
+async function readText(filePath: string, label: string): Promise<string> {
+  try {
+    return await readFile(filePath, "utf8");
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown read error";
     fail(`Unable to read ${label}: ${detail}`);
   }
+}
+
+export function parseSkillsDocument(content: string): ParsedSkillsDocument {
+  const document = asRecord(parseJsonText(content, "skills.json"), "skills.json");
+  const proficiencyScale = asRecord(document.proficiency_scale, "skills.json.proficiency_scale");
+  for (let level = 0; level <= 5; level += 1) {
+    asString(proficiencyScale[String(level)], `skills.json.proficiency_scale.${level}`);
+  }
+  const skills = asArray(document.skills, "skills.json.skills").map(normalizeSkill);
+  const roleProfiles = asArray(document.role_profiles, "skills.json.role_profiles").map(normalizeRoleProfile);
+  assertUnique(skills, (skill) => skill.skill_id, "skill_id in skills.json");
+  assertUnique(roleProfiles, (profile) => roleProfileKey(profile.role, profile.grade), "role/grade profile in skills.json");
+  return { meta: normalizeMeta(document.meta, "skills.json.meta"), skills, roleProfiles };
+}
+
+export function parseEmployeesDocument(content: string): ParsedEmployeesDocument {
+  const document = asRecord(parseJsonText(content, "employees.json"), "employees.json");
+  const employees = asArray(document.employees, "employees.json.employees").map(normalizeEmployee);
+  assertUnique(employees, (employee) => employee.employee_id, "employee_id in employees.json");
+  return { meta: normalizeMeta(document.meta, "employees.json.meta"), employees };
+}
+
+export function parseEventsDocument(content: string): ParsedEventsDocument {
+  const document = asRecord(parseJsonText(content, "events.json"), "events.json");
+  const events = asArray(document.events, "events.json.events").map(normalizeEvent);
+  assertUnique(events, (event) => event.event_id, "event_id in events.json");
+  return { meta: normalizeMeta(document.meta, "events.json.meta"), events };
 }
 
 export function parseActivityHistoryCsv(content: string): ActivityHistoryRecord[] {
@@ -486,26 +538,25 @@ export function parseActivityHistoryCsv(content: string): ActivityHistoryRecord[
     fail(`Unable to parse activity_history.csv: ${detail}`);
   }
 
-  return rows.map(normalizeHistoryRecord);
+  const records = rows.map(normalizeHistoryRecord);
+  assertUnique(records, (record) => record.record_id, "record_id in activity_history.csv");
+  return records;
 }
 
 export async function loadDatasetFromDirectory(dataDirectory: string): Promise<ActiveDataset> {
-  const [skillsRoot, employeesRoot, eventsRoot, historyContent] = await Promise.all([
-    readJson(join(dataDirectory, "skills.json"), "skills.json"),
-    readJson(join(dataDirectory, "employees.json"), "employees.json"),
-    readJson(join(dataDirectory, "events.json"), "events.json"),
-    readFile(join(dataDirectory, "activity_history.csv"), "utf8").catch((error: unknown) => {
-      const detail = error instanceof Error ? error.message : "Unknown read error";
-      fail(`Unable to read activity_history.csv: ${detail}`);
-    }),
+  const [skillsContent, employeesContent, eventsContent, historyContent] = await Promise.all([
+    readText(join(dataDirectory, "skills.json"), "skills.json"),
+    readText(join(dataDirectory, "employees.json"), "employees.json"),
+    readText(join(dataDirectory, "events.json"), "events.json"),
+    readText(join(dataDirectory, "activity_history.csv"), "activity_history.csv"),
   ]);
 
-  const skillsDocument = asRecord(skillsRoot, "skills.json");
-  const employeesDocument = asRecord(employeesRoot, "employees.json");
-  const eventsDocument = asRecord(eventsRoot, "events.json");
-  const skillsMeta = normalizeMeta(skillsDocument.meta, "skills.json.meta");
-  const employeesMeta = normalizeMeta(employeesDocument.meta, "employees.json.meta");
-  const eventsMeta = normalizeMeta(eventsDocument.meta, "events.json.meta");
+  const skillsDocument = parseSkillsDocument(skillsContent);
+  const employeesDocument = parseEmployeesDocument(employeesContent);
+  const eventsDocument = parseEventsDocument(eventsContent);
+  const skillsMeta = skillsDocument.meta;
+  const employeesMeta = employeesDocument.meta;
+  const eventsMeta = eventsDocument.meta;
 
   if (
     skillsMeta.dataset !== employeesMeta.dataset ||
@@ -518,17 +569,12 @@ export async function loadDatasetFromDirectory(dataDirectory: string): Promise<A
     fail("Dataset metadata must match across JSON files.");
   }
 
-  const proficiencyScale = asRecord(skillsDocument.proficiency_scale, "skills.json.proficiency_scale");
-  for (let level = 0; level <= 5; level += 1) {
-    asString(proficiencyScale[String(level)], `skills.json.proficiency_scale.${level}`);
-  }
-
   const dataset: Dataset = {
     snapshotDate: skillsMeta.as_of_date,
-    skills: asArray(skillsDocument.skills, "skills.json.skills").map(normalizeSkill),
-    roleProfiles: asArray(skillsDocument.role_profiles, "skills.json.role_profiles").map(normalizeRoleProfile),
-    employees: asArray(employeesDocument.employees, "employees.json.employees").map(normalizeEmployee),
-    events: asArray(eventsDocument.events, "events.json.events").map(normalizeEvent),
+    skills: skillsDocument.skills,
+    roleProfiles: skillsDocument.roleProfiles,
+    employees: employeesDocument.employees,
+    events: eventsDocument.events,
     activityHistory: parseActivityHistoryCsv(historyContent),
   };
 
