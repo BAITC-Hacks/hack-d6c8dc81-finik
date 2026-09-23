@@ -80,6 +80,7 @@ export interface Event {
   develops_skills: SkillEffect[];
   prerequisites: Record<string, number>;
   upcoming_sessions: string[];
+  recurring?: boolean;
 }
 
 export interface ActivityHistoryRecord {

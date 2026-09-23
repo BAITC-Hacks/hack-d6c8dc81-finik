@@ -1,8 +1,9 @@
+import { applySkillGain } from "../domain/skill-effects.js";
 import { HttpError } from "../domain/errors.js";
 import type { ActiveDataset, ActivityHistoryRecord, Employee, Event, Grade, RoleProfile } from "../domain/types.js";
 import { reconstructCurrentSkills, resolveTargetProfile } from "./profile-service.js";
 import {
-  parseExplanationResponse,
+  getValidatedExplanations,
   type RecommendationExplanationProvider,
   type RecommendationExplanationRequest,
 } from "./recommendation-explanation-provider.js";
@@ -43,8 +44,11 @@ export interface RecommendationItem {
   format: Event["format"];
   duration_hours: number;
   next_session: string | null;
+  recurring: boolean;
+  can_complete: boolean;
   score: number;
   explanation: string;
+  explanation_source: "ai" | "rules";
   factors: RecommendationFactors;
 }
 
@@ -78,12 +82,12 @@ function compareSkillImpacts(left: RecommendationSkillImpact, right: Recommendat
   return left.skill_id.localeCompare(right.skill_id);
 }
 
-function getNextSession(event: Event, snapshotDate: string): string | null {
-  if (event.format === "self_paced") {
-    return null;
-  }
-
-  return event.upcoming_sessions.filter((session) => session >= snapshotDate).sort()[0] ?? null;
+function getNextSession(event: Event, active: ActiveDataset, employeeId: string): string | null {
+  if (event.format === "self_paced") return null;
+  const history = active.indexes.historyByEmployeeId.get(employeeId) ?? [];
+  return event.upcoming_sessions.filter((session) => event.recurring
+    ? !history.some((record) => record.event_id === event.event_id && record.date === session && record.status === "completed")
+    : session >= active.dataset.snapshotDate).sort()[0] ?? null;
 }
 
 function audienceMatches(employee: Employee, event: Event): boolean {
@@ -94,16 +98,6 @@ function prerequisitesAreMet(event: Event, currentSkills: Map<string, number>): 
   return Object.entries(event.prerequisites).every(
     ([skillId, requiredLevel]) => (currentSkills.get(skillId) ?? 0) >= requiredLevel,
   );
-}
-
-/**
- * The supplied schema has no recurrence field. The README names a single
- * exception but IDs cannot be hardcoded, so Phase 3 safely treats every
- * completed event as non-repeatable for recommendations. This policy is kept
- * isolated for replacement when a general recurrence signal becomes available.
- */
-function canRecommendAfterCompletion(_event: Event): boolean {
-  return false;
 }
 
 function hasCompletedEvent(activeDataset: ActiveDataset, employeeId: string, eventId: string): boolean {
@@ -155,7 +149,7 @@ function buildSkillImpacts(
 
     const currentLevel = currentSkills.get(effect.skill_id) ?? 0;
     const gap = Math.max(0, requiredLevel - currentLevel);
-    const expectedLevel = Math.min(5, effect.max_level, currentLevel + effect.gain);
+    const expectedLevel = applySkillGain(currentLevel, effect.gain, effect.max_level);
     const usefulGain = Math.min(gap, Math.max(0, expectedLevel - currentLevel));
     if (usefulGain === 0) {
       return [];
@@ -264,11 +258,11 @@ export function evaluateRecommendationCandidate(
   if (event.mandatory || !audienceMatches(employee, event) || !prerequisitesAreMet(event, currentSkills)) {
     return null;
   }
-  const nextSession = getNextSession(event, activeDataset.dataset.snapshotDate);
+  const nextSession = getNextSession(event, activeDataset, employee.employee_id);
   if (event.format !== "self_paced" && nextSession === null) {
     return null;
   }
-  if (hasCompletedEvent(activeDataset, employee.employee_id, event.event_id) && !canRecommendAfterCompletion(event)) {
+  if (hasCompletedEvent(activeDataset, employee.employee_id, event.event_id) && !event.recurring) {
     return null;
   }
 
@@ -331,8 +325,11 @@ export function getEmployeeRecommendations(
       format: candidate.event.format,
       duration_hours: candidate.event.duration_hours,
       next_session: candidate.nextSession,
+      recurring: candidate.event.recurring ?? false,
+      can_complete: !candidate.event.recurring || (candidate.nextSession !== null && candidate.nextSession <= activeDataset.dataset.snapshotDate),
       score: candidate.score,
       explanation: buildExplanation(candidate),
+      explanation_source: "rules",
       factors: candidate.factors,
     })),
   };
@@ -358,8 +355,14 @@ function buildExplanationRequest(
       event_id: recommendation.event_id,
       activity_title: recommendation.title,
       activity_type: recommendation.type,
+      format: recommendation.format,
+      duration_hours: recommendation.duration_hours,
+      next_session: recommendation.next_session,
       skill_impacts: recommendation.factors.skill_impacts.map((impact) => ({
+        skill_id: impact.skill_id,
         skill_name: impact.name,
+        gain: impact.gain,
+        max_level: impact.max_level,
         current_level: impact.current_level,
         required_level: impact.required_level,
         expected_level: impact.expected_level,
@@ -387,11 +390,9 @@ export async function getEmployeeRecommendationsWithExplanations(
   }
 
   try {
-    const selectedEventIds = new Set(deterministicResponse.recommendations.map((item) => item.event_id));
-    const generated = await explanationProvider.generateExplanations(
-      buildExplanationRequest(activeDataset, deterministicResponse),
+    const explanations = await getValidatedExplanations(
+      explanationProvider, buildExplanationRequest(activeDataset, deterministicResponse),
     );
-    const explanations = parseExplanationResponse(generated, selectedEventIds);
     if (explanations.size === 0) {
       return deterministicResponse;
     }
@@ -401,6 +402,7 @@ export async function getEmployeeRecommendationsWithExplanations(
       recommendations: deterministicResponse.recommendations.map((recommendation) => ({
         ...recommendation,
         explanation: explanations.get(recommendation.event_id) ?? recommendation.explanation,
+        explanation_source: explanations.has(recommendation.event_id) ? "ai" : "rules",
       })),
     };
   } catch {

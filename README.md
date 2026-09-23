@@ -3,9 +3,10 @@
 Employee development demo with a React/Vite frontend and an Express/TypeScript
 backend. The backend owns profiles, skills, career targets, recommendations,
 completion effects, imports, and HR statistics. The interface stays in English.
-Demo entry does not authenticate users; real authentication and AI integration
-are outside this implementation. Explanations are generated deterministically
-from recommendation factors; no LLM configuration or API key is needed.
+Demo entry does not authenticate users; real authentication is outside this MVP.
+Optional OpenAI explanations use validated fact references selected by AI and
+rendered by the backend. Rules still determine eligibility, rankings, skill gains,
+and progress. The app works without an API key.
 
 ## Run locally
 
@@ -37,6 +38,53 @@ Open `http://localhost:5173` and choose **Employee preview** or **HR preview**.
 overriding it. It can also be set in an uncommitted `frontend/.env.local`.
 Restart Vite after changing it; production builds capture the value at build time.
 If the frontend origin changes, set the backend's `CORS_ORIGIN` to match.
+
+## Optional AI and environment setup
+
+Copy the placeholder file once (do not overwrite an existing local `.env`):
+
+```sh
+cp -n backend/.env.example backend/.env
+```
+
+Set `OPENAI_API_KEY` **locally in `backend/.env`**, never in chat or a frontend
+`VITE_` variable. Leave it blank to disable AI. `OPENAI_MODEL` defaults to
+`gpt-5-mini` and can select another Responses API model supporting structured output.
+The backend's startup loads this file using Node's built-in `loadEnvFile`, resolving
+it relative to the backend, independent of your working directory. Existing shell
+variables take precedence, including an explicitly empty key. Both `npm --prefix
+backend start` and `npm --prefix backend run dev` load it. Restart after editing.
+Real `.env` files are ignored; `.env.example` contains no credentials.
+
+Only selected activity facts, target role/grade, skill impacts, and participation
+counts go to OpenAI. Names, contacts, raw history, and the full dataset do not.
+The request uses `store: false`. AI selects references to approved factual sentences;
+the backend checks complete event coverage, duplicates, references, and length.
+This deliberately constrains wording instead of claiming that regex can prove
+arbitrary prose factual. Numeric skill impacts remain separately visible.
+The UI labels AI-assisted versus rule-based explanations.
+
+AI work is limited to 4.5 seconds with no retries. Failures or invalid output use
+`buildExplanation()`. Valid results are cached for 15 minutes (128 entries maximum),
+keyed by model, prompt version, and relevant facts, with identical requests shared.
+At most 16 distinct requests run at once; excess requests use rules. Completion
+returns saved progress immediately; a cancellable follow-up refresh may update
+wording only. HR and empty recommendations never call AI.
+
+Implementation follows the [OpenAI structured-output documentation](https://developers.openai.com/api/docs/guides/structured-outputs).
+Automated tests mock providers; no paid/live request is needed for verification.
+
+## Recurring sessions
+
+The starter club has explicit `recurring: true` metadata. Other events default to
+non-recurring. A recurring activity can be completed once per listed session on or
+before the dataset snapshot (`2026-10-01`), using `session_date`; future sessions
+remain visible with completion disabled. The starter club's first listed session
+is `2026-10-08`, so it is not yet completable at the current snapshot. For recurring
+events, the session catalog may retain past dates. Imported duplicate records for
+the same employee/event/date award skill gains only once. Restart/import and the
+snapshot rules remain unchanged; no wall-clock time is used to unlock sessions.
+See [API_CONTRACT.md](API_CONTRACT.md) for the additive schema and request fields.
 
 ## Test the connected demo
 
@@ -86,7 +134,7 @@ It requires Google Chrome (defaults to its macOS application path; override with
 `CHROME_PATH`), starts isolated test servers on ports `18000` and `15173`, and
 uses Chrome debugging port `19223`. These ports must be free. It checks selection,
 search, stale responses, recommendation factors, completion failure/success,
-duplicate prevention, HR, multipart import, empty recommendations, and retry.
+explanation refresh and source labels, duplicate prevention, HR, multipart import, empty recommendations, and retry.
 It uses a temporary browser profile and a fresh in-memory dataset, then stops its
 processes. It does not modify starter files or the normal running backend.
 

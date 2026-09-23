@@ -218,6 +218,7 @@ function normalizeEvent(value: unknown, index: number): Event {
     target_grades: asArray(record.target_grades, `${path}.target_grades`).map((grade, gradeIndex) =>
       asOneOf(grade, `${path}.target_grades[${gradeIndex}]`, grades) as Grade,
     ),
+    recurring: record.recurring === undefined ? false : asBoolean(record.recurring, `${path}.recurring`),
     develops_skills: asArray(record.develops_skills, `${path}.develops_skills`).map((effect, effectIndex) =>
       normalizeSkillEffect(effect, `${path}.develops_skills[${effectIndex}]`),
     ),
@@ -398,7 +399,10 @@ export function validateDataset(dataset: Dataset): void {
     if (event.format !== "self_paced" && event.upcoming_sessions.length === 0) {
       fail(`Scheduled event ${event.event_id} must have an upcoming session.`);
     }
-    if (event.upcoming_sessions.some((session) => session < dataset.snapshotDate)) {
+    if (event.recurring !== undefined && typeof event.recurring !== "boolean") fail("Event recurring must be boolean.");
+    if (event.recurring && event.format === "self_paced") fail("Recurring events require dated sessions.");
+    if (new Set(event.upcoming_sessions).size !== event.upcoming_sessions.length) fail("Event sessions must have unique dates.");
+    if (!event.recurring && event.upcoming_sessions.some((session) => session < dataset.snapshotDate)) {
       fail(`Event ${event.event_id} has a session before the dataset snapshot.`);
     }
     for (const effect of event.develops_skills) {

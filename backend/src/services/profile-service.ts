@@ -1,3 +1,4 @@
+import { applySkillGain } from "../domain/skill-effects.js";
 import { HttpError } from "../domain/errors.js";
 import type {
   ActiveDataset,
@@ -68,7 +69,12 @@ export function reconstructCurrentSkills(activeDataset: ActiveDataset, employee:
     .filter((record) => record.status === "completed" && record.date > employee.last_review_date)
     .sort((left, right) => left.date.localeCompare(right.date) || left.record_id.localeCompare(right.record_id));
 
+  const appliedOccurrences = new Set<string>();
   for (const record of qualifyingRecords) {
+    // The starter schema identifies a participation occurrence by employee/event/date.
+    const occurrence = JSON.stringify([record.employee_id, record.event_id, record.date]);
+    if (appliedOccurrences.has(occurrence)) continue;
+    appliedOccurrences.add(occurrence);
     const event = activeDataset.indexes.eventsById.get(record.event_id);
     if (!event) {
       continue;
@@ -76,7 +82,7 @@ export function reconstructCurrentSkills(activeDataset: ActiveDataset, employee:
 
     for (const effect of event.develops_skills) {
       const previousLevel = currentSkills.get(effect.skill_id) ?? 0;
-      const nextLevel = Math.min(5, effect.max_level, previousLevel + effect.gain);
+      const nextLevel = applySkillGain(previousLevel, effect.gain, effect.max_level);
       currentSkills.set(effect.skill_id, nextLevel);
     }
   }
