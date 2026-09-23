@@ -462,6 +462,10 @@ export class ActiveDatasetStore {
   get(): ActiveDataset {
     return this.activeDataset;
   }
+
+  replace(activeDataset: ActiveDataset): void {
+    this.activeDataset = activeDataset;
+  }
 }
 
 async function readJson(filePath: string, label: string): Promise<unknown> {
