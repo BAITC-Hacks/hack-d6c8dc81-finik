@@ -16,7 +16,13 @@ describe("GET /api/hr/overview", () => {
   beforeAll(async () => {
     const dataset = await loadDatasetFromDirectory(dataDirectory);
     app = createApp(
-      { port: 8000, corsOrigin: "http://localhost:5173", dataDir: dataDirectory },
+      {
+        port: 8000,
+        corsOrigin: "http://localhost:5173",
+        dataDir: dataDirectory,
+        openAiApiKey: undefined,
+        openAiModel: "gpt-5-mini",
+      },
       new ActiveDatasetStore(dataset),
     );
   });

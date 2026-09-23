@@ -7,13 +7,24 @@ import { createHrRouter } from "./routes/hr.js";
 import { createImportRouter } from "./routes/imports.js";
 import type { AppConfig } from "./config/env.js";
 import type { ActiveDatasetStore } from "./services/dataset-service.js";
+import {
+  createOpenAiRecommendationExplanationProvider,
+  type RecommendationExplanationProvider,
+} from "./services/recommendation-explanation-provider.js";
 
-export function createApp(config: AppConfig, datasetStore: ActiveDatasetStore) {
+export function createApp(
+  config: AppConfig,
+  datasetStore: ActiveDatasetStore,
+  explanationProvider: RecommendationExplanationProvider | undefined = createOpenAiRecommendationExplanationProvider({
+    apiKey: config.openAiApiKey,
+    model: config.openAiModel,
+  }),
+) {
   const app = express();
 
   app.use(cors({ origin: config.corsOrigin }));
   app.use(express.json());
-  app.use("/api", createEmployeeRouter(datasetStore));
+  app.use("/api", createEmployeeRouter(datasetStore, explanationProvider));
   app.use("/api", createHrRouter(datasetStore));
   app.use("/api", createImportRouter(datasetStore));
 
