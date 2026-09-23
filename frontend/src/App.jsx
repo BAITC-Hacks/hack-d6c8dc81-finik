@@ -2,6 +2,9 @@ import { useState } from 'react'
 import employeeData from '../../employees.json'
 import skillData from '../../skills.json'
 import './App.css'
+import CareerTrajectory from './CareerTrajectory'
+import Recommendations from './Recommendations'
+import HrDashboard from './HrDashboard'
 
 const employees = employeeData.employees
 
@@ -10,6 +13,7 @@ const skillNames = Object.fromEntries(
 )
 
 function App() {
+  const [activeView, setActiveView] = useState('employee')
   const [selectedId, setSelectedId] = useState(
     employees[0]?.employee_id ?? '',
   )
@@ -40,6 +44,29 @@ function App() {
 
         <span className="dataset-label">Synthetic demo data</span>
       </header>
+      <nav className="view-navigation" aria-label="Dashboard views">
+  <button
+    type="button"
+    className={activeView === 'employee' ? 'view-button active' : 'view-button'}
+    aria-pressed={activeView === 'employee'}
+    onClick={() => setActiveView('employee')}
+  >
+    Employee view
+  </button>
+
+  <button
+    type="button"
+    className={activeView === 'hr' ? 'view-button active' : 'view-button'}
+    aria-pressed={activeView === 'hr'}
+    onClick={() => setActiveView('hr')}
+  >
+    HR overview
+  </button>
+</nav>
+
+{activeView === 'hr' && <HrDashboard />}
+
+<div hidden={activeView !== 'employee'}>
 
       <section className="card employee-picker">
         <label htmlFor="employee">Choose an employee</label>
@@ -59,7 +86,9 @@ function App() {
           ))}
         </select>
       </section>
-
+      
+      <CareerTrajectory employee={employee} />
+      <Recommendations />
       <div className="profile-layout">
         <section className="card profile-card">
           <p className="eyebrow">EMPLOYEE PROFILE</p>
@@ -95,11 +124,13 @@ function App() {
           </dl>
         </section>
 
-        <section className="card skills-card">
-          <div className="section-heading">
-            <h2>Assessed skills</h2>
-            <span>Level 0–5</span>
-          </div>
+        <details className="card skills-card" key={employee.employee_id}>
+          <summary className="skills-summary">
+            <span>All assessed skills</span>
+            <span className="skills-count">
+              {Object.keys(employee.skills).length} skills
+            </span>
+          </summary>
 
           <p className="assessment-note">
             Recorded at the last assessment: {employee.last_review_date}.
@@ -124,7 +155,8 @@ function App() {
               </div>
             ))}
           </div>
-        </section>
+        </details>
+      </div>
       </div>
     </main>
   )
