@@ -27,3 +27,52 @@ select,
 textarea {
   font: inherit;
 }
+
+.language-switcher {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #d3dfd6;
+  border-radius: 10px;
+  background: #f1f5f2;
+}
+
+.language-switcher button {
+  min-width: 48px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #4d6556;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.language-switcher button.selected {
+  background: #174f40;
+  color: #ffffff;
+}
+
+.language-switcher button:focus-visible {
+  outline: 3px solid #248365;
+  outline-offset: 3px;
+}
+
+.login-language-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 32px;
+}
+
+/* Allow room for longer translated labels. */
+.login-password-wrapper input {
+  padding-right: 112px;
+}
+
+.login-demo-buttons button {
+  overflow-wrap: anywhere;
+}
