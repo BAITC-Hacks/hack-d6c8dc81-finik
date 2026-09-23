@@ -42,4 +42,58 @@ describe("GET /api/employees", () => {
       error: { code: "NOT_FOUND", message: "The requested API resource was not found." },
     });
   });
+
+  it("returns the exact profile response shape for a real employee", async () => {
+    const response = await request(app).get("/api/employees/E0001").expect(200);
+
+    expect(Object.keys(response.body).sort()).toEqual([
+      "employee_id",
+      "full_name",
+      "grade",
+      "history",
+      "readiness",
+      "role",
+      "skills",
+      "target_grade",
+      "target_role",
+      "tenure_months",
+    ]);
+    expect(response.body).toMatchObject({
+      employee_id: "E0001",
+      full_name: "Marat Yessenov",
+      role: "Backend Engineer",
+      grade: "Junior",
+      target_role: "Backend Engineer",
+      target_grade: "Middle",
+    });
+    expect(response.body.skills[0]).toEqual({
+      skill_id: expect.any(String),
+      name: expect.any(String),
+      current_level: expect.any(Number),
+      required_level: expect.any(Number),
+      gap: expect.any(Number),
+      critical: expect.any(Boolean),
+    });
+    expect(response.body.history[0]).toEqual({
+      record_id: expect.any(String),
+      event_id: expect.any(String),
+      event_title: expect.any(String),
+      date: expect.any(String),
+      status: expect.any(String),
+    });
+    expect(response.body.readiness).toEqual({
+      requirements_met: expect.any(Number),
+      requirements_total: expect.any(Number),
+      critical_requirements_met: expect.any(Number),
+      critical_requirements_total: expect.any(Number),
+    });
+  });
+
+  it("returns a contract-compatible 404 for an unknown employee", async () => {
+    const response = await request(app).get("/api/employees/E_UNKNOWN").expect(404);
+
+    expect(response.body).toEqual({
+      error: { code: "EMPLOYEE_NOT_FOUND", message: "Employee E_UNKNOWN was not found." },
+    });
+  });
 });
