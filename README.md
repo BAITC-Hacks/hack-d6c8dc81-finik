@@ -1,4 +1,96 @@
-# Career Quest — Dataset
+# Career Quest
+
+Employee development demo with a React/Vite frontend and an Express/TypeScript
+backend. The backend owns profiles, skills, career targets, recommendations,
+completion effects, imports, and HR statistics. The interface stays in English.
+Demo entry does not authenticate users; real authentication and AI integration
+are outside this implementation. Explanations are generated deterministically
+from recommendation factors; no LLM configuration or API key is needed.
+
+## Run locally
+
+Prerequisites: Node.js **22.12+** (verified on 24.15.0), npm, and the four starter
+files in this repository's root. Run these commands from the repository root.
+
+Terminal 1 — backend:
+
+```sh
+npm --prefix backend ci
+npm --prefix backend run build
+npm --prefix backend start
+```
+
+The API listens at `http://localhost:8000/api`. For automatic backend reloads,
+use `npm --prefix backend run dev` instead of the build/start commands.
+Optional backend environment variables: `PORT` (default `8000`), `CORS_ORIGIN`
+(default `http://localhost:5173`), and `DATA_DIR` (default repository root).
+
+Terminal 2 — frontend:
+
+```sh
+npm --prefix frontend ci
+VITE_API_BASE_URL=http://localhost:8000/api npm --prefix frontend run dev -- --host localhost --port 5173 --strictPort
+```
+
+Open `http://localhost:5173` and choose **Employee preview** or **HR preview**.
+`VITE_API_BASE_URL` defaults to `http://localhost:8000/api`; include `/api` when
+overriding it. It can also be set in an uncommitted `frontend/.env.local`.
+Restart Vite after changing it; production builds capture the value at build time.
+If the frontend origin changes, set the backend's `CORS_ORIGIN` to match.
+
+## Test the connected demo
+
+1. Enter Employee preview; search by name, role, or ID and select an employee.
+2. Inspect current target skills, trajectory, readiness milestones, and 0–3
+   recommended activities with explanations, skill impacts, and history factors.
+3. Select **Mark completed**. Profile, history, skills, milestones, and
+   recommendations update without a reload; celebration appears only on success.
+4. Open **HR overview** to fetch live counts, skill gaps, participation, and
+   employees without a recommended step.
+5. Import any subset of `employees.json`, `events.json`, `skills.json`, and
+   `activity_history.csv` in HR. Files must use the starter-kit schema and metadata.
+   HR and the employee list refresh; the selected employee is preserved if present.
+6. Return to My growth and select the imported employee. The same backend logic
+   handles both starter and imported profiles. API failures show an error and retry
+   option; the frontend never substitutes sample data.
+
+Completion and import changes are **in memory**. Restarting the backend reloads
+the source dataset. The dataset snapshot, not the computer date, controls calculations.
+The profile API exposes target skills and readiness counts, but not work format or
+assessment date; those unsupported details are omitted. Milestone badges and the
+progress ring visualize backend readiness counts, without recalculating skill gaps
+or promotion eligibility. See [API_CONTRACT.md](API_CONTRACT.md).
+
+## Checks
+
+```sh
+npm --prefix frontend test
+npm --prefix frontend run lint
+npm --prefix frontend run build
+npm --prefix backend test
+npm --prefix backend run typecheck
+npm --prefix backend run build
+```
+
+The backend has no separate lint script. Endpoint tests require permission to
+open local sockets. Frontend unit tests use Node's built-in test runner.
+
+A dependency-free browser smoke test is also included:
+
+```sh
+npm --prefix backend run build
+node frontend/scripts/browser-smoke.mjs
+```
+
+It requires Google Chrome (defaults to its macOS application path; override with
+`CHROME_PATH`), starts isolated test servers on ports `18000` and `15173`, and
+uses Chrome debugging port `19223`. These ports must be free. It checks selection,
+search, stale responses, recommendation factors, completion failure/success,
+duplicate prevention, HR, multipart import, empty recommendations, and retry.
+It uses a temporary browser profile and a fresh in-memory dataset, then stops its
+processes. It does not modify starter files or the normal running backend.
+
+## Starter dataset
 
 Synthetic data. No real people or companies.
 

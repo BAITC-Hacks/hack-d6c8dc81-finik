@@ -93,6 +93,7 @@ export function getHrOverview(activeDataset: ActiveDataset): HrOverviewResponse 
       }
     }
 
+    // HR needs deterministic eligibility only; never request AI wording for aggregates.
     if (getEmployeeRecommendations(activeDataset, employee.employee_id).recommendations.length === 0) {
       employeesWithoutStep.push({
         employee_id: employee.employee_id,
