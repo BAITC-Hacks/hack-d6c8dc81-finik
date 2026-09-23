@@ -76,6 +76,16 @@ The backend uses the OpenAI Responses API only after deterministic selection. By
 - If `OPENAI_API_KEY` is absent, the provider fails, or its output is invalid, the backend returns its deterministic explanations.
 - HR analytics do not call OpenAI.
 
+## Technologies
+
+| Area | Implementation |
+| --- | --- |
+| Frontend | JavaScript, React 19, React DOM, Vite 8, and ESLint. |
+| Backend | TypeScript, Node.js, Express 5, CORS, Multer, and `csv-parse`. |
+| Validation and tests | TypeScript compiler, Vitest, Supertest, and Node's built-in test runner. |
+| AI integration | OpenAI Node SDK and the OpenAI Responses API; `gpt-5-mini` by default when an API key is provided. |
+| Data | Local JSON and CSV starter files; no database or external HR system is required. |
+
 ## Architecture
 
 ```text
@@ -148,6 +158,10 @@ npm run dev -- --host localhost --port 5173 --strictPort
 Open the frontend at [http://localhost:5173](http://localhost:5173). The backend listens at [http://localhost:8000/api](http://localhost:8000/api) by default.
 
 For a production-style local backend start, build it first and then run `npm start` from `backend/`.
+
+## Deployment
+
+No deployed URL or deployment configuration is present in this repository. The documented target is local execution for the hackathon demo.
 
 ## Environment Variables
 
